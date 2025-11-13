@@ -1,0 +1,18 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.out
+*.tmp
+*.old
+*.bak
+
+# Build artifacts
+build/
+dist/
+*.spec
+*.tar.gz
+poco-stability-monitor-*
+*.swp

@@ -1,0 +1,11 @@
+# Python requirements for Poco CAN test harness
+
+# Core CAN bus library (cross-platform)
+python-can>=4.0.0
+
+# GUI libraries
+PyQt5>=5.15.0  # Modern GUI with circular switches and color wheel
+# tkinter  # Basic GUI (usually included with Python)
+
+# Optional: For advanced features
+# pyserial>=3.5  # If using serial-based CAN adapters
