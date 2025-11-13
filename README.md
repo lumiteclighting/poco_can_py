@@ -1,24 +1,14 @@
 # Poco CAN Python Examples
 
-Python-based control library and examples for the Lumitec Poco CAN bus proprietary protocol. This provides a cross-platform reference implementation for third-party integration and testing.
-
-## Quick Start
-
-### 1. Example GUI Launcher
-
-This script should install the necessary requirements into a python virtual environment and run a launcher GUI to demonstrate the examples. 
-```bash
-./start_example.sh
-```
+Python library and examples for controlling the [Lumitec Poco Digital Lighting Control Module](https://www.lumiteclighting.com/poco-4-digital-lighting-control-module.html) using a CAN bus proprietary protocol. This repository provides a cross-platform reference implementation for third-party integration and testing.
 
 ## Installation
 
 ### Prerequisites
 
-1. **OS**: 
-   - Linux (tested with Ubuntu 24.04)
-   - Windows (not tested)
-   - MacOS (not tested)
+1. **OS**: **Linux** (tested with Ubuntu 24.04)
+
+   *Windows should be capable, but not tested.*
    
 2. **Python 3.7+** (tested with Python 3.8+)
 
@@ -39,7 +29,7 @@ This script should install the necessary requirements into a python virtual envi
    ```
    [...] peak_usb 1-2.3:1.0 can0: attached to PCAN-USB channel 0 (device 0x000000FF)
    ```
-   This shows the driver has added the `can0` interface. You may see `can1`, `can2`, etc.
+   This shows the driver has added the `can0` interface. You may see `can1`, `can2`, etc. If you don't see a can interface, you may need to load the driver for your hardware. See troubleshooting section below.
 
 2. **Configure CAN interface (250 kbps baud):**
 
@@ -59,16 +49,21 @@ This script should install the necessary requirements into a python virtual envi
 
 ### Windows Setup
 
-TODO: not tested
+TODO. (See Windows section of: https://python-can.readthedocs.io/en/stable/installation.html)
 
-### macOS Setup
+## Quick Start
 
-TODO: not tested
+### 1. Example GUI Launcher
+
+This script should install the necessary requirements into a python virtual environment and run a launcher GUI to demonstrate the examples. 
+```bash
+./start_example.sh
+```
 
 ## Troubleshooting
 
-### 
-**Load kernel modules:**
+### No can0 interface 
+You may need to **load kernel modules:**
 
 ```bash
 sudo modprobe can
