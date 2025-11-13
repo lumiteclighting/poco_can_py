@@ -53,7 +53,12 @@ TODO. (See Windows section of: https://python-can.readthedocs.io/en/stable/insta
 
 ## Quick Start
 
-### 1. Example GUI Launcher
+### Clone this repository
+```sh
+git clone https://github.com/lumiteclighting/poco_can_py.git
+cd poco_can_py
+```
+### Run Example GUI Launcher
 
 This script should install the necessary requirements into a python virtual environment and run a launcher GUI to demonstrate the examples. 
 ```bash
