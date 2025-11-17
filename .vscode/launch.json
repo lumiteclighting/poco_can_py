@@ -1,6 +1,9 @@
 {
+
   "configurations": [
     {
+      // This expects poco_can_py folder is the root of the open workspace in vscode.
+      // Tip: use a multi-root workspace where poco_can_py/ is one of the roots.
       "type": "debugpy",
       "request": "launch",
       "name": "Launch Poco CAN Example Launcher",

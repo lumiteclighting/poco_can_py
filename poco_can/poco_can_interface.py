@@ -404,19 +404,15 @@ class PocoCANInterfaceLevel0(PocoCANInterfaceBase):
         Args:
             channel: Output channel (1-4, will be clamped)
             hue: Hue (0-255: 0=Red, 85=Green, 170=Blue, 255=close to Red)
-            saturation: Saturation (0-255, will be scaled to 0-7 for protocol)
-            brightness: Brightness (0-255, will be scaled to 0-15 for protocol)
+            saturation: Saturation (0-15)
+            brightness: Brightness (0-15)
             pli_clan: PLI clan identifier (0-63)
             transition: Transition mode (0-7)
             priority: CAN priority (0-7)
         """
-        # Convert user-friendly 0-255 ranges to protocol ranges
-        protocol_saturation = int((saturation / 255.0) * 7)  # Scale 0-255 to 0-7
-        protocol_brightness = int((brightness / 255.0) * 15)  # Scale 0-255 to 0-15
-
-        data = encode_outch_pli_t2hsb(channel, hue, protocol_saturation, protocol_brightness, pli_clan, transition)
+        data = encode_outch_pli_t2hsb(channel, hue, saturation, brightness, pli_clan, transition)
         self.send_proprietary(data, priority)
-        logger.info(f"PLI T2HSB Ch{channel}: Clan={pli_clan} Trans={transition} H={hue} S={saturation}->{protocol_saturation} B={brightness}->{protocol_brightness}")
+        logger.info(f"PLI T2HSB Ch{channel}: Clan={pli_clan} Trans={transition} H={hue} S={saturation} B={brightness}")
 
     def send_pli_t2rgb(self, channel: int, red: int, green: int, blue: int,
                       pli_clan: int = 0, transition: int = 0, priority: int = 3):
@@ -432,14 +428,9 @@ class PocoCANInterfaceLevel0(PocoCANInterfaceBase):
             transition: Transition mode (0-7)
             priority: CAN priority (0-7)
         """
-        # Convert user-friendly 0-255 ranges to protocol 5-bit ranges (0-31)
-        protocol_red = int((red / 255.0) * 31)
-        protocol_green = int((green / 255.0) * 31)
-        protocol_blue = int((blue / 255.0) * 31)
-
-        data = encode_outch_pli_t2rgb(channel, protocol_red, protocol_green, protocol_blue, pli_clan, transition)
+        data = encode_outch_pli_t2rgb(channel, red, green, blue, pli_clan, transition)
         self.send_proprietary(data, priority)
-        logger.info(f"PLI T2RGB Ch{channel}: Clan={pli_clan} Trans={transition} R={red}->{protocol_red} G={green}->{protocol_green} B={blue}->{protocol_blue}")
+        logger.info(f"PLI T2RGB Ch{channel}: Clan={pli_clan} Trans={transition} R={red} G={green} B={blue}")
 
     def send_pli_t2hs(self, channel: int, hue: int, saturation: int,
                      pli_clan: int = 0, transition: int = 0, priority: int = 3):
@@ -449,7 +440,7 @@ class PocoCANInterfaceLevel0(PocoCANInterfaceBase):
         Args:
             channel: Output channel (1-4, will be clamped)
             hue: Hue (0-255: 0=Red, 85=Green, 170=Blue, 255=close to Red)
-            saturation: Saturation (0-255: 0=White, 255=Fully saturated)
+            saturation: Saturation (0-15: 0=White, 15=Fully saturated)
             pli_clan: PLI clan identifier (0-63)
             transition: Transition mode (0-7)
             priority: CAN priority (0-7)
@@ -497,7 +488,7 @@ class PocoCANInterfaceLevel0(PocoCANInterfaceBase):
 
         Args:
             channel: Output channel (1-4, will be clamped)
-            pattern: Pattern ID (0-255: see pattern table)
+            pattern: Pattern ID (0-253: see pattern table)
             pli_clan: PLI clan identifier (0-63)
             transition: Transition mode (0-7)
             priority: CAN priority (0-7)
@@ -1026,7 +1017,7 @@ if __name__ == "__main__":
         # Level 0 example (Output Channel Control)
         with PocoCANInterfaceLevel0(interface='socketcan', channel='can0') as poco:
             print("\nLevel 0 - Output Channel Control:")
-            poco.send_pli_t2hsb(channel=1, hue=0, saturation=255, brightness=255)  # Red, full saturation and brightness
+            poco.send_pli_t2hsb(channel=1, hue=0, saturation=15, brightness=15)  # Red, full saturation and brightness
             poco.send_pwm_channel(channel=1, duty_cycle=127)  # 50% PWM
             poco.send_binary_channel(channel=2, state=True)   # Binary ON
             print("Level 0 test completed!")

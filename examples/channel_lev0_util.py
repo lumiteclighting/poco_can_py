@@ -206,37 +206,58 @@ class ChannelOutputCommandsGUI(QMainWindow):
 
         layout.addWidget(status_group)
 
-        # Tabs for different command types
-        tabs = QTabWidget()
+        # Tabs for different command types - Store tab widget and tab content for enable/disable
+        self.command_tabs = QTabWidget()
+
+        # Store references to each tab's content widget for targeted enable/disable
+        self.tab_contents = []
 
         # Tab 1: Binary Channel Control
-        tabs.addTab(self._create_binary_tab(), "Binary (On/Off)")
+        binary_tab = self._create_binary_tab()
+        self.tab_contents.append(binary_tab)
+        self.command_tabs.addTab(binary_tab, "Binary (On/Off)")
 
         # Tab 2: PWM Channel Control
-        tabs.addTab(self._create_pwm_tab(), "PWM (Brightness)")
+        pwm_tab = self._create_pwm_tab()
+        self.tab_contents.append(pwm_tab)
+        self.command_tabs.addTab(pwm_tab, "PWM (Brightness)")
 
         # Tab 3: Raw PLI Message
-        tabs.addTab(self._create_raw_pli_tab(), "Raw PLI (Hex)")
+        raw_pli_tab = self._create_raw_pli_tab()
+        self.tab_contents.append(raw_pli_tab)
+        self.command_tabs.addTab(raw_pli_tab, "Raw PLI (Hex)")
 
         # Tab 4: PLI T2HSB
-        tabs.addTab(self._create_t2hsb_tab(), "T2HSB (Hue/Sat/Bright)")
+        t2hsb_tab = self._create_t2hsb_tab()
+        self.tab_contents.append(t2hsb_tab)
+        self.command_tabs.addTab(t2hsb_tab, "T2HSB (Hue/Sat/Bright)")
 
         # Tab 5: PLI T2RGB
-        tabs.addTab(self._create_t2rgb_tab(), "T2RGB (RGB Color)")
+        t2rgb_tab = self._create_t2rgb_tab()
+        self.tab_contents.append(t2rgb_tab)
+        self.command_tabs.addTab(t2rgb_tab, "T2RGB (RGB Color)")
 
         # Tab 6: PLI T2HS
-        tabs.addTab(self._create_t2hs_tab(), "T2HS (Hue/Sat)")
+        t2hs_tab = self._create_t2hs_tab()
+        self.tab_contents.append(t2hs_tab)
+        self.command_tabs.addTab(t2hs_tab, "T2HS (Hue/Sat)")
 
         # Tab 7: PLI T2B
-        tabs.addTab(self._create_t2b_tab(), "T2B (Brightness)")
+        t2b_tab = self._create_t2b_tab()
+        self.tab_contents.append(t2b_tab)
+        self.command_tabs.addTab(t2b_tab, "T2B (Brightness)")
 
         # Tab 8: PLI T2BD
-        tabs.addTab(self._create_t2bd_tab(), "T2BD (Brightness Delta)")
+        t2bd_tab = self._create_t2bd_tab()
+        self.tab_contents.append(t2bd_tab)
+        self.command_tabs.addTab(t2bd_tab, "T2BD (Brightness Delta)")
 
         # Tab 9: PLI T2P
-        tabs.addTab(self._create_t2p_tab(), "T2P (Pattern)")
+        t2p_tab = self._create_t2p_tab()
+        self.tab_contents.append(t2p_tab)
+        self.command_tabs.addTab(t2p_tab, "T2P (Pattern)")
 
-        layout.addWidget(tabs)
+        layout.addWidget(self.command_tabs)
 
         # Log
         log_label = QLabel("Command Log:")
@@ -249,7 +270,6 @@ class ChannelOutputCommandsGUI(QMainWindow):
         layout.addWidget(self.log_text)
 
         # Status
-        # Status
         self.status_label = create_status_label("Not connected")
         layout.addWidget(self.status_label)
 
@@ -257,35 +277,64 @@ class ChannelOutputCommandsGUI(QMainWindow):
         self._set_controls_enabled(False)
 
     def _set_controls_enabled(self, enabled):
-        """Enable or disable all control widgets"""
-        # Binary tab controls
-        self.bin_channel_spin.setEnabled(enabled)
-        self.bin_on_btn.setEnabled(enabled)
-        self.bin_off_btn.setEnabled(enabled)
+        """Enable or disable all command control widgets while keeping tab navigation active"""
+        # Disable each tab's content widget individually, preserving tab navigation
+        for tab_widget in self.tab_contents:
+            tab_widget.setEnabled(enabled)
 
-        # PWM tab controls
-        self.pwm_channel_spin.setEnabled(enabled)
-        self.pwm_slider.setEnabled(enabled)
-        for btn in self.pwm_preset_btns:
-            btn.setEnabled(enabled)
+    def _create_channel_selection_layout(self, prefix):
+        """Create common channel selection layout and return (layout, spinbox)"""
+        channel_layout = QHBoxLayout()
+        channel_layout.addWidget(QLabel("Output Channel (0-4, 0: All):"))
 
-        # Raw PLI tab controls
-        self.raw_channel_spin.setEnabled(enabled)
-        self.raw_pli_edit.setEnabled(enabled)
-        self.raw_pli_send_btn.setEnabled(enabled)
-        for btn in self.raw_pli_example_btns:
-            btn.setEnabled(enabled)
+        channel_spin = QSpinBox()
+        channel_spin.setMinimum(0)
+        channel_spin.setMaximum(4)
+        setattr(self, f"{prefix}_channel_spin", channel_spin)
 
-        # T2HSB tab controls
-        self.t2hsb_channel_spin.setEnabled(enabled)
-        self.t2hsb_clan_spin.setEnabled(enabled)
-        self.t2hsb_transition_spin.setEnabled(enabled)
-        self.t2hsb_hue_spin.setEnabled(enabled)
-        self.t2hsb_sat_spin.setEnabled(enabled)
-        self.t2hsb_bright_spin.setEnabled(enabled)
-        self.t2hsb_send_btn.setEnabled(enabled)
-        for btn in self.t2hsb_preset_btns:
-            btn.setEnabled(enabled)
+        channel_layout.addWidget(channel_spin)
+        channel_layout.addStretch()
+
+        return channel_layout, channel_spin
+
+    def _create_pli_protocol_group(self, prefix):
+        """Create common PLI Protocol group and return (group, clan_spin, transition_spin)"""
+        protocol_group = QGroupBox("PLI Protocol")
+        protocol_layout = QGridLayout(protocol_group)
+
+        # PLI Clan
+        protocol_layout.addWidget(QLabel("PLI Clan (0-63):"), 0, 0)
+        clan_spin = QSpinBox()
+        clan_spin.setMinimum(0)
+        clan_spin.setMaximum(63)
+        clan_spin.setValue(0)
+        protocol_layout.addWidget(clan_spin, 0, 1)
+        protocol_layout.addWidget(QLabel("(6-bit PLI clan identifier)"), 0, 2)
+        setattr(self, f"{prefix}_clan_spin", clan_spin)
+
+        # Transition
+        protocol_layout.addWidget(QLabel("Transition (0-7):"), 1, 0)
+        transition_spin = QSpinBox()
+        transition_spin.setMinimum(0)
+        transition_spin.setMaximum(7)
+        transition_spin.setValue(0)
+        protocol_layout.addWidget(transition_spin, 1, 1)
+        protocol_layout.addWidget(QLabel("(3-bit transition mode)"), 1, 2)
+        setattr(self, f"{prefix}_transition_spin", transition_spin)
+
+        return protocol_group, clan_spin, transition_spin
+
+    def _create_tab_base(self, description):
+        """Create base tab structure with description and return (tab, layout)"""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(15, 15, 15, 15)
+
+        info = QLabel(description)
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        return tab, layout
 
 
     def _on_connected(self, base_interface):
@@ -370,22 +419,10 @@ class ChannelOutputCommandsGUI(QMainWindow):
 
     def _create_binary_tab(self):
         """Create tab for: Binary channel control"""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-
-        info = QLabel("OUTPUTCH_BIN - Binary on/off channel control")
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        tab, layout = self._create_tab_base("OUTPUTCH_BIN - Binary on/off channel control")
 
         # Channel selection
-        channel_layout = QHBoxLayout()
-        channel_layout.addWidget(QLabel("Output Channel (1-4):"))
-        self.bin_channel_spin = QSpinBox()
-        self.bin_channel_spin.setMinimum(1)
-        self.bin_channel_spin.setMaximum(4)
-        channel_layout.addWidget(self.bin_channel_spin)
-        channel_layout.addStretch()
+        channel_layout, _ = self._create_channel_selection_layout("bin")
         layout.addLayout(channel_layout)
 
         # Control buttons
@@ -408,22 +445,10 @@ class ChannelOutputCommandsGUI(QMainWindow):
 
     def _create_pwm_tab(self):
         """Create tab for PWM channel control"""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-
-        info = QLabel("OUTPUTCH_PWM - PWM duty cycle control (0-100%)")
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        tab, layout = self._create_tab_base("OUTPUTCH_PWM - PWM duty cycle control (0-100%)")
 
         # Channel selection
-        channel_layout = QHBoxLayout()
-        channel_layout.addWidget(QLabel("Output Channel (1-4):"))
-        self.pwm_channel_spin = QSpinBox()
-        self.pwm_channel_spin.setMinimum(1)
-        self.pwm_channel_spin.setMaximum(4)
-        channel_layout.addWidget(self.pwm_channel_spin)
-        channel_layout.addStretch()
+        channel_layout, _ = self._create_channel_selection_layout("pwm")
         layout.addLayout(channel_layout)
 
         # PWM duty cycle slider
@@ -468,22 +493,10 @@ class ChannelOutputCommandsGUI(QMainWindow):
 
     def _create_raw_pli_tab(self):
         """Create tab for Raw PLI message"""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-
-        info = QLabel("OUTPUTCH_PLI_RAW - Send raw 32-bit PLI message to output channel")
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        tab, layout = self._create_tab_base("OUTPUTCH_PLI_RAW - Send raw 32-bit PLI message to output channel")
 
         # Channel selection
-        channel_layout = QHBoxLayout()
-        channel_layout.addWidget(QLabel("Output Channel (1-4):"))
-        self.raw_channel_spin = QSpinBox()
-        self.raw_channel_spin.setMinimum(1)
-        self.raw_channel_spin.setMaximum(4)
-        channel_layout.addWidget(self.raw_channel_spin)
-        channel_layout.addStretch()
+        channel_layout, _ = self._create_channel_selection_layout("raw")
         layout.addLayout(channel_layout)
 
         # Raw message input
@@ -537,46 +550,14 @@ class ChannelOutputCommandsGUI(QMainWindow):
 
     def _create_t2hsb_tab(self):
         """Create tab for PLI T2HSB convenience command"""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-
-        info = QLabel("OUTPUTCH_PLI_T2HSB - Transition to HSB color (convenience wrapper)")
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        tab, layout = self._create_tab_base("OUTPUTCH_PLI_T2HSB - Transition to HSB color (convenience wrapper)")
 
         # Channel selection
-        channel_layout = QHBoxLayout()
-        channel_layout.addWidget(QLabel("Output Channel (1-4):"))
-        self.t2hsb_channel_spin = QSpinBox()
-        self.t2hsb_channel_spin.setMinimum(1)
-        self.t2hsb_channel_spin.setMaximum(4)
-        channel_layout.addWidget(self.t2hsb_channel_spin)
-        channel_layout.addStretch()
+        channel_layout, _ = self._create_channel_selection_layout("t2hsb")
         layout.addLayout(channel_layout)
 
         # PLI Protocol controls
-        protocol_group = QGroupBox("PLI Protocol")
-        protocol_layout = QGridLayout(protocol_group)
-
-        # PLI Clan
-        protocol_layout.addWidget(QLabel("PLI Clan (0-63):"), 0, 0)
-        self.t2hsb_clan_spin = QSpinBox()
-        self.t2hsb_clan_spin.setMinimum(0)
-        self.t2hsb_clan_spin.setMaximum(63)
-        self.t2hsb_clan_spin.setValue(0)
-        protocol_layout.addWidget(self.t2hsb_clan_spin, 0, 1)
-        protocol_layout.addWidget(QLabel("(6-bit PLI clan identifier)"), 0, 2)
-
-        # Transition
-        protocol_layout.addWidget(QLabel("Transition (0-7):"), 1, 0)
-        self.t2hsb_transition_spin = QSpinBox()
-        self.t2hsb_transition_spin.setMinimum(0)
-        self.t2hsb_transition_spin.setMaximum(7)
-        self.t2hsb_transition_spin.setValue(0)
-        protocol_layout.addWidget(self.t2hsb_transition_spin, 1, 1)
-        protocol_layout.addWidget(QLabel("(3-bit transition mode)"), 1, 2)
-
+        protocol_group, _, _ = self._create_pli_protocol_group("t2hsb")
         layout.addWidget(protocol_group)
 
         # HSB controls
@@ -593,22 +574,22 @@ class ChannelOutputCommandsGUI(QMainWindow):
         hsb_layout.addWidget(QLabel("(0=Red, 85=Green, 170=Blue)"), 0, 2)
 
         # Saturation
-        hsb_layout.addWidget(QLabel("Saturation (0-255):"), 1, 0)
+        hsb_layout.addWidget(QLabel("Saturation (0-15):"), 1, 0)
         self.t2hsb_sat_spin = QSpinBox()
         self.t2hsb_sat_spin.setMinimum(0)
-        self.t2hsb_sat_spin.setMaximum(255)
-        self.t2hsb_sat_spin.setValue(255)
+        self.t2hsb_sat_spin.setMaximum(15)
+        self.t2hsb_sat_spin.setValue(15)
         hsb_layout.addWidget(self.t2hsb_sat_spin, 1, 1)
-        hsb_layout.addWidget(QLabel("(0=White, 255=Full color)"), 1, 2)
+        hsb_layout.addWidget(QLabel("(0=White, 7=Full color)"), 1, 2)
 
         # Brightness
-        hsb_layout.addWidget(QLabel("Brightness (0-255):"), 2, 0)
+        hsb_layout.addWidget(QLabel("Brightness (0-15):"), 2, 0)
         self.t2hsb_bright_spin = QSpinBox()
         self.t2hsb_bright_spin.setMinimum(0)
-        self.t2hsb_bright_spin.setMaximum(255)
-        self.t2hsb_bright_spin.setValue(255)
+        self.t2hsb_bright_spin.setMaximum(15)
+        self.t2hsb_bright_spin.setValue(15)
         hsb_layout.addWidget(self.t2hsb_bright_spin, 2, 1)
-        hsb_layout.addWidget(QLabel("(0=Off, 255=Full)"), 2, 2)
+        hsb_layout.addWidget(QLabel("(0=Off, 15=Full)"), 2, 2)
 
         layout.addWidget(hsb_group)
 
@@ -640,66 +621,38 @@ class ChannelOutputCommandsGUI(QMainWindow):
 
     def _create_t2rgb_tab(self):
         """Create tab for PLI T2RGB command (RGB color)"""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-
-        info = QLabel("OUTPUTCH_PLI_T2RGB - Set RGB color (5-bit per channel, 0-255 scaled)")
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        tab, layout = self._create_tab_base("OUTPUTCH_PLI_T2RGB - Set RGB color (5-bit per channel, 0-255 scaled)")
 
         # Channel selection
-        channel_layout = QHBoxLayout()
-        channel_layout.addWidget(QLabel("Output Channel (1-4):"))
-        self.t2rgb_channel_spin = QSpinBox()
-        self.t2rgb_channel_spin.setMinimum(1)
-        self.t2rgb_channel_spin.setMaximum(4)
-        channel_layout.addWidget(self.t2rgb_channel_spin)
-        channel_layout.addStretch()
+        channel_layout, _ = self._create_channel_selection_layout("t2rgb")
         layout.addLayout(channel_layout)
 
         # PLI Protocol controls
-        protocol_group = QGroupBox("PLI Protocol")
-        protocol_layout = QGridLayout(protocol_group)
-
-        protocol_layout.addWidget(QLabel("PLI Clan (0-63):"), 0, 0)
-        self.t2rgb_clan_spin = QSpinBox()
-        self.t2rgb_clan_spin.setMinimum(0)
-        self.t2rgb_clan_spin.setMaximum(63)
-        self.t2rgb_clan_spin.setValue(0)
-        protocol_layout.addWidget(self.t2rgb_clan_spin, 0, 1)
-
-        protocol_layout.addWidget(QLabel("Transition (0-7):"), 1, 0)
-        self.t2rgb_transition_spin = QSpinBox()
-        self.t2rgb_transition_spin.setMinimum(0)
-        self.t2rgb_transition_spin.setMaximum(7)
-        self.t2rgb_transition_spin.setValue(0)
-        protocol_layout.addWidget(self.t2rgb_transition_spin, 1, 1)
-
+        protocol_group, _, _ = self._create_pli_protocol_group("t2rgb")
         layout.addWidget(protocol_group)
 
         # RGB controls
         rgb_group = QGroupBox("RGB Color")
         rgb_layout = QGridLayout(rgb_group)
 
-        rgb_layout.addWidget(QLabel("Red (0-255):"), 0, 0)
+        rgb_layout.addWidget(QLabel("Red (0-31):"), 0, 0)
         self.t2rgb_red_spin = QSpinBox()
         self.t2rgb_red_spin.setMinimum(0)
-        self.t2rgb_red_spin.setMaximum(255)
-        self.t2rgb_red_spin.setValue(255)
+        self.t2rgb_red_spin.setMaximum(31)
+        self.t2rgb_red_spin.setValue(31)
         rgb_layout.addWidget(self.t2rgb_red_spin, 0, 1)
 
-        rgb_layout.addWidget(QLabel("Green (0-255):"), 1, 0)
+        rgb_layout.addWidget(QLabel("Green (0-31):"), 1, 0)
         self.t2rgb_green_spin = QSpinBox()
         self.t2rgb_green_spin.setMinimum(0)
-        self.t2rgb_green_spin.setMaximum(255)
+        self.t2rgb_green_spin.setMaximum(31)
         self.t2rgb_green_spin.setValue(0)
         rgb_layout.addWidget(self.t2rgb_green_spin, 1, 1)
 
-        rgb_layout.addWidget(QLabel("Blue (0-255):"), 2, 0)
+        rgb_layout.addWidget(QLabel("Blue (0-31):"), 2, 0)
         self.t2rgb_blue_spin = QSpinBox()
         self.t2rgb_blue_spin.setMinimum(0)
-        self.t2rgb_blue_spin.setMaximum(255)
+        self.t2rgb_blue_spin.setMaximum(31)
         self.t2rgb_blue_spin.setValue(0)
         rgb_layout.addWidget(self.t2rgb_blue_spin, 2, 1)
 
@@ -714,14 +667,14 @@ class ChannelOutputCommandsGUI(QMainWindow):
         # Color presets
         presets_layout = QHBoxLayout()
         presets = [
-            ("Red", 255, 0, 0),
-            ("Green", 0, 255, 0),
-            ("Blue", 0, 0, 255),
-            ("Yellow", 255, 255, 0),
-            ("Cyan", 0, 255, 255),
-            ("Magenta", 255, 0, 255),
-            ("White", 255, 255, 255),
-            ("Orange", 255, 131, 0),
+            ("Red", 31, 0, 0),
+            ("Green", 0, 31, 0),
+            ("Blue", 0, 0, 31),
+            ("Yellow", 31, 31, 0),
+            ("Cyan", 0, 31, 31),
+            ("Magenta", 31, 0, 31),
+            ("White", 31, 31, 31),
+            ("Orange", 31, 16, 0),
         ]
         for name, r, g, b in presets:
             btn = QPushButton(name)
@@ -734,42 +687,14 @@ class ChannelOutputCommandsGUI(QMainWindow):
 
     def _create_t2hs_tab(self):
         """Create tab for PLI T2HS command (Hue/Sat only)"""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-
-        info = QLabel("OUTPUTCH_PLI_T2HS - Set Hue/Saturation (preserves brightness)")
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        tab, layout = self._create_tab_base("OUTPUTCH_PLI_T2HS - Set Hue/Saturation (preserves brightness)")
 
         # Channel selection
-        channel_layout = QHBoxLayout()
-        channel_layout.addWidget(QLabel("Output Channel (1-4):"))
-        self.t2hs_channel_spin = QSpinBox()
-        self.t2hs_channel_spin.setMinimum(1)
-        self.t2hs_channel_spin.setMaximum(4)
-        channel_layout.addWidget(self.t2hs_channel_spin)
-        channel_layout.addStretch()
+        channel_layout, _ = self._create_channel_selection_layout("t2hs")
         layout.addLayout(channel_layout)
 
         # PLI Protocol controls
-        protocol_group = QGroupBox("PLI Protocol")
-        protocol_layout = QGridLayout(protocol_group)
-
-        protocol_layout.addWidget(QLabel("PLI Clan (0-63):"), 0, 0)
-        self.t2hs_clan_spin = QSpinBox()
-        self.t2hs_clan_spin.setMinimum(0)
-        self.t2hs_clan_spin.setMaximum(63)
-        self.t2hs_clan_spin.setValue(0)
-        protocol_layout.addWidget(self.t2hs_clan_spin, 0, 1)
-
-        protocol_layout.addWidget(QLabel("Transition (0-7):"), 1, 0)
-        self.t2hs_transition_spin = QSpinBox()
-        self.t2hs_transition_spin.setMinimum(0)
-        self.t2hs_transition_spin.setMaximum(7)
-        self.t2hs_transition_spin.setValue(0)
-        protocol_layout.addWidget(self.t2hs_transition_spin, 1, 1)
-
+        protocol_group, _, _ = self._create_pli_protocol_group("t2hs")
         layout.addWidget(protocol_group)
 
         # HS controls
@@ -784,13 +709,13 @@ class ChannelOutputCommandsGUI(QMainWindow):
         hs_layout.addWidget(self.t2hs_hue_spin, 0, 1)
         hs_layout.addWidget(QLabel("(0=Red, 85=Green, 170=Blue)"), 0, 2)
 
-        hs_layout.addWidget(QLabel("Saturation (0-255):"), 1, 0)
+        hs_layout.addWidget(QLabel("Saturation (0-15):"), 1, 0)
         self.t2hs_sat_spin = QSpinBox()
         self.t2hs_sat_spin.setMinimum(0)
-        self.t2hs_sat_spin.setMaximum(255)
-        self.t2hs_sat_spin.setValue(255)
+        self.t2hs_sat_spin.setMaximum(15)
+        self.t2hs_sat_spin.setValue(15)
         hs_layout.addWidget(self.t2hs_sat_spin, 1, 1)
-        hs_layout.addWidget(QLabel("(0=White, 255=Full color)"), 1, 2)
+        hs_layout.addWidget(QLabel("(0=White, 15=Full color)"), 1, 2)
 
         layout.addWidget(hs_group)
 
@@ -819,42 +744,14 @@ class ChannelOutputCommandsGUI(QMainWindow):
 
     def _create_t2b_tab(self):
         """Create tab for PLI T2B command (Brightness only)"""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-
-        info = QLabel("OUTPUTCH_PLI_T2B - Set Brightness (preserves color)")
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        tab, layout = self._create_tab_base("OUTPUTCH_PLI_T2B - Set Brightness (preserves color)")
 
         # Channel selection
-        channel_layout = QHBoxLayout()
-        channel_layout.addWidget(QLabel("Output Channel (1-4):"))
-        self.t2b_channel_spin = QSpinBox()
-        self.t2b_channel_spin.setMinimum(1)
-        self.t2b_channel_spin.setMaximum(4)
-        channel_layout.addWidget(self.t2b_channel_spin)
-        channel_layout.addStretch()
+        channel_layout, _ = self._create_channel_selection_layout("t2b")
         layout.addLayout(channel_layout)
 
         # PLI Protocol controls
-        protocol_group = QGroupBox("PLI Protocol")
-        protocol_layout = QGridLayout(protocol_group)
-
-        protocol_layout.addWidget(QLabel("PLI Clan (0-63):"), 0, 0)
-        self.t2b_clan_spin = QSpinBox()
-        self.t2b_clan_spin.setMinimum(0)
-        self.t2b_clan_spin.setMaximum(63)
-        self.t2b_clan_spin.setValue(0)
-        protocol_layout.addWidget(self.t2b_clan_spin, 0, 1)
-
-        protocol_layout.addWidget(QLabel("Transition (0-7):"), 1, 0)
-        self.t2b_transition_spin = QSpinBox()
-        self.t2b_transition_spin.setMinimum(0)
-        self.t2b_transition_spin.setMaximum(7)
-        self.t2b_transition_spin.setValue(0)
-        protocol_layout.addWidget(self.t2b_transition_spin, 1, 1)
-
+        protocol_group, _, _ = self._create_pli_protocol_group("t2b")
         layout.addWidget(protocol_group)
 
         # Brightness control
@@ -899,42 +796,14 @@ class ChannelOutputCommandsGUI(QMainWindow):
 
     def _create_t2bd_tab(self):
         """Create tab for PLI T2BD command (Brightness Delta)"""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-
-        info = QLabel("OUTPUTCH_PLI_T2BD - Adjust Brightness by Delta (-127 to +127)")
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        tab, layout = self._create_tab_base("OUTPUTCH_PLI_T2BD - Adjust Brightness by Delta (-127 to +127)")
 
         # Channel selection
-        channel_layout = QHBoxLayout()
-        channel_layout.addWidget(QLabel("Output Channel (1-4):"))
-        self.t2bd_channel_spin = QSpinBox()
-        self.t2bd_channel_spin.setMinimum(1)
-        self.t2bd_channel_spin.setMaximum(4)
-        channel_layout.addWidget(self.t2bd_channel_spin)
-        channel_layout.addStretch()
+        channel_layout, _ = self._create_channel_selection_layout("t2bd")
         layout.addLayout(channel_layout)
 
         # PLI Protocol controls
-        protocol_group = QGroupBox("PLI Protocol")
-        protocol_layout = QGridLayout(protocol_group)
-
-        protocol_layout.addWidget(QLabel("PLI Clan (0-63):"), 0, 0)
-        self.t2bd_clan_spin = QSpinBox()
-        self.t2bd_clan_spin.setMinimum(0)
-        self.t2bd_clan_spin.setMaximum(63)
-        self.t2bd_clan_spin.setValue(0)
-        protocol_layout.addWidget(self.t2bd_clan_spin, 0, 1)
-
-        protocol_layout.addWidget(QLabel("Transition (0-7):"), 1, 0)
-        self.t2bd_transition_spin = QSpinBox()
-        self.t2bd_transition_spin.setMinimum(0)
-        self.t2bd_transition_spin.setMaximum(7)
-        self.t2bd_transition_spin.setValue(0)
-        protocol_layout.addWidget(self.t2bd_transition_spin, 1, 1)
-
+        protocol_group, _, _ = self._create_pli_protocol_group("t2bd")
         layout.addWidget(protocol_group)
 
         # Delta control
@@ -971,52 +840,24 @@ class ChannelOutputCommandsGUI(QMainWindow):
 
     def _create_t2p_tab(self):
         """Create tab for PLI T2P command (Pattern)"""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        layout.setContentsMargins(15, 15, 15, 15)
-
-        info = QLabel("OUTPUTCH_PLI_T2P - Start Pattern/Effect")
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        tab, layout = self._create_tab_base("OUTPUTCH_PLI_T2P - Start Pattern/Effect")
 
         # Channel selection
-        channel_layout = QHBoxLayout()
-        channel_layout.addWidget(QLabel("Output Channel (1-4):"))
-        self.t2p_channel_spin = QSpinBox()
-        self.t2p_channel_spin.setMinimum(1)
-        self.t2p_channel_spin.setMaximum(4)
-        channel_layout.addWidget(self.t2p_channel_spin)
-        channel_layout.addStretch()
+        channel_layout, _ = self._create_channel_selection_layout("t2p")
         layout.addLayout(channel_layout)
 
         # PLI Protocol controls
-        protocol_group = QGroupBox("PLI Protocol")
-        protocol_layout = QGridLayout(protocol_group)
-
-        protocol_layout.addWidget(QLabel("PLI Clan (0-63):"), 0, 0)
-        self.t2p_clan_spin = QSpinBox()
-        self.t2p_clan_spin.setMinimum(0)
-        self.t2p_clan_spin.setMaximum(63)
-        self.t2p_clan_spin.setValue(0)
-        protocol_layout.addWidget(self.t2p_clan_spin, 0, 1)
-
-        protocol_layout.addWidget(QLabel("Transition (0-7):"), 1, 0)
-        self.t2p_transition_spin = QSpinBox()
-        self.t2p_transition_spin.setMinimum(0)
-        self.t2p_transition_spin.setMaximum(7)
-        self.t2p_transition_spin.setValue(0)
-        protocol_layout.addWidget(self.t2p_transition_spin, 1, 1)
-
+        protocol_group, _, _ = self._create_pli_protocol_group("t2p")
         layout.addWidget(protocol_group)
 
         # Pattern selection
         pattern_group = QGroupBox("Pattern")
         pattern_layout = QGridLayout(pattern_group)
 
-        pattern_layout.addWidget(QLabel("Pattern ID (0-255):"), 0, 0)
+        pattern_layout.addWidget(QLabel("Pattern ID (0-253):"), 0, 0)
         self.t2p_pattern_spin = QSpinBox()
         self.t2p_pattern_spin.setMinimum(0)
-        self.t2p_pattern_spin.setMaximum(255)
+        self.t2p_pattern_spin.setMaximum(253)
         self.t2p_pattern_spin.setValue(4)
         pattern_layout.addWidget(self.t2p_pattern_spin, 0, 1)
 

@@ -134,6 +134,13 @@ def encode_proprietary_header(manufacturer_code: int,
     header = struct.pack('<HB', proprietary_info, proprietary_id)
     return header
 
+def _pack_vsw_common(prop_id, act_id, sw_id, byte5, byte6, byte7):
+    header = encode_proprietary_header(
+        NMEA2K_MANUFACTURER_LUMITEC,
+        NMEA2K_INDUSTRY_MARINE,
+        prop_id
+    )
+    return header + struct.pack('BBBBB', act_id, sw_id, byte5, byte6, byte7)
 
 def encode_vsw_simple_action(switch_id: int, action_id: VSwAction) -> bytes:
     """
@@ -153,16 +160,8 @@ def encode_vsw_simple_action(switch_id: int, action_id: VSwAction) -> bytes:
     Returns:
         8 bytes ready to send as CAN data
     """
-    header = encode_proprietary_header(
-        NMEA2K_MANUFACTURER_LUMITEC,
-        NMEA2K_INDUSTRY_MARINE,
-        ProprietaryID.VSW_SIMPLE_ACTIONS
-    )
 
-    payload = struct.pack('BB', action_id, switch_id)
-    padding = b'\xFF\xFF\xFF'  # Unused bytes
-
-    return header + payload + padding
+    return _pack_vsw_common(ProprietaryID.VSW_SIMPLE_ACTIONS, action_id, switch_id, 0xFF, 0xFF, 0xFF)
 
 
 def encode_vsw_hsb(switch_id: int,
@@ -192,20 +191,8 @@ def encode_vsw_hsb(switch_id: int,
     Returns:
         8 bytes ready to send as CAN data
     """
-    header = encode_proprietary_header(
-        NMEA2K_MANUFACTURER_LUMITEC,
-        NMEA2K_INDUSTRY_MARINE,
-        ProprietaryID.VSW_CUSTOM_HSB
-    )
 
-    payload = struct.pack('BBBBB',
-                         action,
-                         switch_id,
-                         hue & 0xFF,
-                         saturation & 0xFF,
-                         brightness & 0xFF)
-
-    return header + payload
+    return _pack_vsw_common(ProprietaryID.VSW_CUSTOM_HSB, action, (switch_id & 0xFF), (hue & 0xFF), (saturation & 0xFF), (brightness & 0xFF))
 
 
 def encode_vsw_custom_rgb(switch_id: int, red: int, green: int, blue: int) -> bytes:
@@ -230,21 +217,8 @@ def encode_vsw_custom_rgb(switch_id: int, red: int, green: int, blue: int) -> by
     Returns:
         8 bytes ready to send as CAN data
     """
-    header = encode_proprietary_header(
-        NMEA2K_MANUFACTURER_LUMITEC,
-        NMEA2K_INDUSTRY_MARINE,
-        ProprietaryID.VSW_CUSTOM_RGB
-    )
 
-    payload = struct.pack('BBBBB',
-                         VSwAction.T2RGB,  # Action ID = 11
-                         switch_id & 0xFF,
-                         red & 0xFF,
-                         green & 0xFF,
-                         blue & 0xFF)
-
-    return header + payload
-
+    return _pack_vsw_common(ProprietaryID.VSW_CUSTOM_RGB, VSwAction.T2RGB, (switch_id & 0xFF), (red & 0xFF), (green & 0xFF), (blue & 0xFF))
 
 def encode_vsw_delta_brightness(switch_id: int, delta: int) -> bytes:
     """
@@ -265,23 +239,11 @@ def encode_vsw_delta_brightness(switch_id: int, delta: int) -> bytes:
     Returns:
         8 bytes ready to send as CAN data
     """
-    header = encode_proprietary_header(
-        NMEA2K_MANUFACTURER_LUMITEC,
-        NMEA2K_INDUSTRY_MARINE,
-        ProprietaryID.VSW_DELTABRIGHT  # PID 6
-    )
 
     # Clamp delta to valid range
     delta = max(-128, min(127, delta))
 
-    payload = struct.pack('BBbBB',
-                         VSwAction.T2BD,  # Action ID = 5
-                         switch_id & 0xFF,
-                         delta,  # signed byte
-                         0xFF,   # Unused
-                         0xFF)   # Unused
-
-    return header + payload
+    return _pack_vsw_common(ProprietaryID.VSW_DELTABRIGHT, VSwAction.T2BD, (switch_id & 0xFF), delta, 0xFF, 0xFF)
 
 
 def encode_vsw_pocofx_start(switch_id: int, pocofx_id: int) -> bytes:
@@ -291,9 +253,10 @@ def encode_vsw_pocofx_start(switch_id: int, pocofx_id: int) -> bytes:
     PGN 61184, PID 4 - Single frame (8 bytes)
     Field layout:
     - Bytes 0-2: Proprietary header
-    - Byte 3: Switch ID
-    - Byte 4: PocoFx ID (0-255)
-    - Bytes 5-7: Unused/Reserved
+    - Byte 3: Action ID - POCOFX_START
+    - Byte 4: Switch ID (0-253)
+    - Byte 5: PocoFx ID (0-255)
+    - Bytes 6-7: Unused/Reserved
 
     Args:
         switch_id: Virtual Switch ID (0-31)
@@ -302,16 +265,8 @@ def encode_vsw_pocofx_start(switch_id: int, pocofx_id: int) -> bytes:
     Returns:
         8 bytes ready to send as CAN data
     """
-    header = encode_proprietary_header(
-        NMEA2K_MANUFACTURER_LUMITEC,
-        NMEA2K_INDUSTRY_MARINE,
-        ProprietaryID.VSW_POCOFX_ID
-    )
 
-    payload = struct.pack('BB', switch_id, pocofx_id)
-    padding = b'\xFF\xFF\xFF'
-
-    return header + payload + padding
+    return _pack_vsw_common(ProprietaryID.VSW_POCOFX_ID, VSwAction.POCOFX_START, (switch_id & 0xFD), (pocofx_id & 0xFF), 0xFF, 0xFF)
 
 
 def encode_outch_binary_channel(channel: int, state: int) -> bytes:
@@ -401,6 +356,20 @@ def encode_outch_pli_raw(channel: int, pli_message: int) -> bytes:
 
     return header + payload
 
+def _pack_pli_common(prop_id, chan, clan, trans, byte6, byte7):
+    #common validate for chan, clan, transition
+    chan = max(0, min(4, chan))
+    clan = max(0, min(63, clan))  # 0-63
+    trans = max(0, min(7, trans))  # 0-7
+
+    header = encode_proprietary_header(
+        NMEA2K_MANUFACTURER_LUMITEC,
+        NMEA2K_INDUSTRY_MARINE,
+        prop_id
+    )
+    byte4_clan = (clan & 0x3F)
+    byte5_trans = (trans & 0x07)
+    return header + struct.pack('BBBBB', chan, byte4_clan, byte5_trans, byte6, byte7)
 
 def encode_outch_pli_t2hsb(channel: int, hue: int, saturation: int, brightness: int,
                           pli_clan: int = 0, transition: int = 0) -> bytes:
@@ -413,11 +382,11 @@ def encode_outch_pli_t2hsb(channel: int, hue: int, saturation: int, brightness: 
     Field layout per protocol spec:
     - Bytes 0-1: Manufacturer Code (11 bits) + Reserved (2 bits) + Industry Code (3 bits)
     - Byte 2: Proprietary ID (40)
-    - Byte 3: Channel (1-4)
-    - Byte 4: PLI Clan (6 bits, bits 0-5) + Transition high bit (bit 7-6)
-    - Byte 5: Transition low bits (bits 0-1) + Brightness (4 bits, bits 2-5) + unused (bits 6-7)
+    - Byte 3: Channel (1-4, 0: All Chs)
+    - Byte 4: PLI Clan (0-63)
+    - Byte 5: Transition (0-7)
     - Byte 6: Hue (8 bits, 0-255)
-    - Byte 7: Saturation (3 bits, bits 0-2) + unused (bits 3-7)
+    - Byte 7: Saturation (3 bits: 0-7, bits 0-2) + Brightness (4 bits: 0-15, bits 3-6)
 
     Args:
         channel: Poco output channel (1-4)
@@ -430,35 +399,18 @@ def encode_outch_pli_t2hsb(channel: int, hue: int, saturation: int, brightness: 
     Returns:
         8 bytes ready to send as CAN data
     """
-    header = encode_proprietary_header(
-        NMEA2K_MANUFACTURER_LUMITEC,
-        NMEA2K_INDUSTRY_MARINE,
-        ProprietaryID.OUTPUTCH_PLI_T2HSB
-    )
 
     # Validate ranges according to protocol spec
-    channel = max(1, min(4, channel))
     hue = max(0, min(255, hue))
-    saturation = max(0, min(7, saturation))  # 3 bits = 0-7
+    saturation = max(0, min(15, saturation))  # 4 bits = 0-15
     brightness = max(0, min(15, brightness))  # 4 bits = 0-15
-    pli_clan = max(0, min(63, pli_clan))  # 6 bits = 0-63
-    transition = max(0, min(7, transition))  # 3 bits = 0-7
-
-    # Byte 4: PLI Clan (6 bits, bits 0-5) + Transition high bits (2 bits, bits 6-7)
-    byte4 = (pli_clan & 0x3F) | ((transition & 0x6) << 5)  # Clan in bits 0-5, transition bits 1-2 to bits 6-7
-
-    # Byte 5: Transition low bit (bit 0) + Brightness (4 bits, bits 2-5) + unused (3 bits)
-    byte5 = ((transition & 0x1) << 1) | ((brightness & 0xF) << 2)  # Transition bit 0 to bit 1, brightness to bits 2-5
 
     # Byte 6: Hue (full 8 bits)
     byte6 = hue
+    # Byte 7: Saturation (4 bits, bits 0-3) + Brightness (4 bits, bits 4-7)
+    byte7 = (saturation & 0x0F) | ((brightness & 0x0F) << 4)
 
-    # Byte 7: Saturation (3 bits) + unused
-    byte7 = saturation  # Saturation in bits 0-2, bits 3-7 unused
-
-    payload = struct.pack('BBBB', channel, byte4, byte5, byte6)
-
-    return header + payload + struct.pack('B', byte7)
+    return _pack_pli_common(ProprietaryID.OUTPUTCH_PLI_T2HSB, channel, pli_clan, transition, byte6, byte7)
 
 
 def encode_outch_pli_t2rgb(channel: int, red: int, green: int, blue: int,
@@ -472,10 +424,11 @@ def encode_outch_pli_t2rgb(channel: int, red: int, green: int, blue: int,
     Field layout per firmware implementation:
     - Bytes 0-2: Proprietary header (Lumitec mfr, industry, PID)
     - Byte 3: Channel (1-4)
-    - Byte 4: PLI Clan (6 bits, bits 0-5) + Transition low bits (2 bits, bits 6-7)
-    - Byte 5: Red (5 bits, bits 0-4) + Transition MSB (bit 7)
+    - Byte 4: PLI Clan (0-63)
+    - Byte 5: Transition (0-7)
+    - Byte 6: Red (5 bits, bits 0-4) + Transition MSB (bit 7)
     - Byte 6: Green (5 bits, bits 0-4)
-    - Byte 7: Blue (5 bits, bits 0-4)
+    - Byte 7: Blue (5 bits, bits 0-4) & 1 bit reserved (bit 7)
 
     Args:
         channel: Poco output channel (1-4)
@@ -488,34 +441,20 @@ def encode_outch_pli_t2rgb(channel: int, red: int, green: int, blue: int,
     Returns:
         8 bytes ready to send as CAN data
     """
-    header = encode_proprietary_header(
-        NMEA2K_MANUFACTURER_LUMITEC,
-        NMEA2K_INDUSTRY_MARINE,
-        ProprietaryID.OUTPUTCH_PLI_T2RGB
-    )
 
     # Validate ranges
-    channel = max(1, min(4, channel))
     red = max(0, min(31, red))      # 5 bits = 0-31
     green = max(0, min(31, green))  # 5 bits = 0-31
     blue = max(0, min(31, blue))    # 5 bits = 0-31
-    pli_clan = max(0, min(63, pli_clan))  # 6 bits = 0-63
-    transition = max(0, min(7, transition))  # 3 bits = 0-7
 
-    # Byte 4: PLI Clan (6 bits, bits 0-5) + Transition low 2 bits (bits 6-7)
-    byte4 = (pli_clan & 0x3F) | ((transition & 0x03) << 6)
+    rgb_packed = (red & 0x1F) | ((green & 0x1F) << 5) | ((blue & 0x1F) << 10)
 
-    # Byte 5: Red (5 bits, bits 0-4) + Transition MSB (bit 7)
-    byte5 = (red & 0x1F) | ((transition & 0x04) << 5)
+    # Byte 6:  Lower 8 bit segment of rgb packed bytes
+    byte6 = rgb_packed & 0xFF
+    # Byte 7: Upper 8 bit  segment of rgb packed bytes
+    byte7 = (rgb_packed >> 8) & 0xFF
 
-    # Byte 6: Green (5 bits, bits 0-4)
-    byte6 = green & 0x1F
-
-    # Byte 7: Blue (5 bits, bits 0-4)
-    byte7 = blue & 0x1F
-
-    return header + struct.pack('BBBBB', channel, byte4, byte5, byte6, byte7)
-
+    return _pack_pli_common(ProprietaryID.OUTPUTCH_PLI_T2RGB, channel, pli_clan, transition, byte6, byte7)
 
 def encode_outch_pli_t2hs(channel: int, hue: int, saturation: int,
                           pli_clan: int = 0, transition: int = 0) -> bytes:
@@ -528,10 +467,10 @@ def encode_outch_pli_t2hs(channel: int, hue: int, saturation: int,
     Field layout per firmware implementation:
     - Bytes 0-2: Proprietary header (Lumitec mfr, industry, PID)
     - Byte 3: Channel (1-4)
-    - Byte 4: PLI Clan (6 bits, bits 0-5) + Transition low bits (2 bits, bits 6-7)
-    - Byte 5: Saturation (4 bits, bits 0-3) + Transition MSB (bit 7)
+    - Byte 4: PLI Clan (0-63)
+    - Byte 5: Transition (0-7)
     - Byte 6: Hue (full 8 bits)
-    - Byte 7: Reserved
+    - Byte 7: Saturation (4 bits, bits 0-3) +  Reserved (0xFF bits 4-7)
 
     Args:
         channel: Poco output channel (1-4)
@@ -544,35 +483,17 @@ def encode_outch_pli_t2hs(channel: int, hue: int, saturation: int,
     Returns:
         8 bytes ready to send as CAN data
     """
-    header = encode_proprietary_header(
-        NMEA2K_MANUFACTURER_LUMITEC,
-        NMEA2K_INDUSTRY_MARINE,
-        ProprietaryID.OUTPUTCH_PLI_T2HS
-    )
 
     # Validate ranges
-    channel = max(1, min(4, channel))
     hue = max(0, min(255, hue))
-    saturation = max(0, min(255, saturation))
-    pli_clan = max(0, min(63, pli_clan))
-    transition = max(0, min(7, transition))
-
-    # Scale saturation from 8-bit (0-255) to 4-bit (0-15)
-    sat_4bit = saturation // 17  # 255/15 = 17
-
-    # Byte 4: PLI Clan (6 bits, bits 0-5) + Transition low 2 bits (bits 6-7)
-    byte4 = (pli_clan & 0x3F) | ((transition & 0x03) << 6)
-
-    # Byte 5: Saturation (4 bits, bits 0-3) + Transition MSB (bit 7)
-    byte5 = (sat_4bit & 0x0F) | ((transition & 0x04) << 5)
+    saturation = max(0, min(15, saturation))
 
     # Byte 6: Hue (full 8 bits)
     byte6 = hue & 0xFF
+    # Byte 7: Saturation (4 bits, bits 0-3) & Reserved- 0xF (bits 4-7)
+    byte7 = (saturation & 0x0F) | (0xF << 4)
 
-    # Byte 7: Reserved
-    byte7 = 0
-
-    return header + struct.pack('BBBBB', channel, byte4, byte5, byte6, byte7)
+    return _pack_pli_common(ProprietaryID.OUTPUTCH_PLI_T2HS, channel, pli_clan, transition, byte6, byte7)
 
 
 def encode_outch_pli_t2b(channel: int, brightness: int,
@@ -586,10 +507,10 @@ def encode_outch_pli_t2b(channel: int, brightness: int,
     Field layout per firmware implementation:
     - Bytes 0-2: Proprietary header (Lumitec mfr, industry, PID)
     - Byte 3: Channel (1-4)
-    - Byte 4: PLI Clan (6 bits, bits 0-5) + Transition (3 bits, bits 6-7 + overflow)
-    - Byte 5: Brightness (full 8 bits, 0-255)
-    - Byte 6: Reserved
-    - Byte 7: Reserved
+    - Byte 4: PLI Clan (0-63)
+    - Byte 5: Transition (0-7)
+    - Byte 6: Brightness (full 8 bits, 0-255)
+    - Byte 7: Reserved - 0xFF
 
     Args:
         channel: Poco output channel (1-4)
@@ -600,31 +521,16 @@ def encode_outch_pli_t2b(channel: int, brightness: int,
     Returns:
         8 bytes ready to send as CAN data
     """
-    header = encode_proprietary_header(
-        NMEA2K_MANUFACTURER_LUMITEC,
-        NMEA2K_INDUSTRY_MARINE,
-        ProprietaryID.OUTPUTCH_PLI_T2B
-    )
 
     # Validate ranges
-    channel = max(1, min(4, channel))
     brightness = max(0, min(255, brightness))
-    pli_clan = max(0, min(63, pli_clan))
-    transition = max(0, min(7, transition))
 
-    # Byte 4: PLI Clan (6 bits, bits 0-5) + Transition (2 bits, bits 6-7)
-    byte4 = (pli_clan & 0x3F) | ((transition & 0x03) << 6)
-
-    # Byte 5: Brightness (full 8 bits)
-    byte5 = brightness & 0xFF
-
-    # Byte 6: Reserved
-    byte6 = 0
-
+    # Byte 6: Brightness (full 8 bits)
+    byte6 = brightness & 0xFF
     # Byte 7: Reserved
-    byte7 = 0
+    byte7 = 0xFF
 
-    return header + struct.pack('BBBBB', channel, byte4, byte5, byte6, byte7)
+    return _pack_pli_common(ProprietaryID.OUTPUTCH_PLI_T2B, channel, pli_clan, transition, byte6, byte7)
 
 
 def encode_outch_pli_t2bd(channel: int, delta: int,
@@ -638,10 +544,10 @@ def encode_outch_pli_t2bd(channel: int, delta: int,
     Field layout per firmware implementation:
     - Bytes 0-2: Proprietary header (Lumitec mfr, industry, PID)
     - Byte 3: Channel (1-4)
-    - Byte 4: PLI Clan (6 bits, bits 0-5) + Transition (3 bits, bits 6-7 + overflow)
-    - Byte 5: Delta Brightness (signed 8 bits, -127 to +127)
-    - Byte 6: Reserved
-    - Byte 7: Reserved
+    - Byte 4: PLI Clan (0-63)
+    - Byte 5: Transition (0-7)
+    - Byte 6: Delta Brightness (signed 8 bits, -127 to +127)
+    - Byte 7: Reserved - 0xFF
 
     Args:
         channel: Poco output channel (1-4)
@@ -652,34 +558,18 @@ def encode_outch_pli_t2bd(channel: int, delta: int,
     Returns:
         8 bytes ready to send as CAN data
     """
-    header = encode_proprietary_header(
-        NMEA2K_MANUFACTURER_LUMITEC,
-        NMEA2K_INDUSTRY_MARINE,
-        ProprietaryID.OUTPUTCH_PLI_T2BD
-    )
 
     # Validate ranges
-    channel = max(1, min(4, channel))
     delta = max(-127, min(127, delta))
-    pli_clan = max(0, min(63, pli_clan))
-    transition = max(0, min(7, transition))
-
     # Convert signed delta to unsigned byte for transmission
     delta_byte = delta & 0xFF if delta >= 0 else (256 + delta)
 
-    # Byte 4: PLI Clan (6 bits, bits 0-5) + Transition (2 bits, bits 6-7)
-    byte4 = (pli_clan & 0x3F) | ((transition & 0x03) << 6)
-
-    # Byte 5: Delta (signed 8 bits as unsigned byte)
-    byte5 = delta_byte & 0xFF
-
-    # Byte 6: Reserved
-    byte6 = 0
-
+    # Byte 6: Delta (signed 8 bits as unsigned byte)
+    byte6 = delta_byte & 0xFF
     # Byte 7: Reserved
-    byte7 = 0
+    byte7 = 0xFF
 
-    return header + struct.pack('BBBBB', channel, byte4, byte5, byte6, byte7)
+    return _pack_pli_common(ProprietaryID.OUTPUTCH_PLI_T2BD, channel, pli_clan, transition, byte6, byte7)
 
 
 def encode_outch_pli_t2p(channel: int, pattern: int,
@@ -693,9 +583,9 @@ def encode_outch_pli_t2p(channel: int, pattern: int,
     Field layout per firmware implementation:
     - Bytes 0-2: Proprietary header (Lumitec mfr, industry, PID)
     - Byte 3: Channel (1-4)
-    - Byte 4: PLI Clan (6 bits, bits 0-5) + Transition (3 bits, bits 6-7 + overflow)
-    - Byte 5: Pattern ID (full 8 bits, 0-255)
-    - Byte 6: Reserved
+    - Byte 4: PLI Clan (0-63)
+    - Byte 5: Transition (0-7)
+    - Byte 6: Pattern ID (full 8 bits, 0-253)
     - Byte 7: Reserved
 
     Args:
@@ -707,31 +597,16 @@ def encode_outch_pli_t2p(channel: int, pattern: int,
     Returns:
         8 bytes ready to send as CAN data
     """
-    header = encode_proprietary_header(
-        NMEA2K_MANUFACTURER_LUMITEC,
-        NMEA2K_INDUSTRY_MARINE,
-        ProprietaryID.OUTPUTCH_PLI_T2P
-    )
 
     # Validate ranges
-    channel = max(1, min(4, channel))
-    pattern = max(0, min(255, pattern))
-    pli_clan = max(0, min(63, pli_clan))
-    transition = max(0, min(7, transition))
-
-    # Byte 4: PLI Clan (6 bits, bits 0-5) + Transition (2 bits, bits 6-7)
-    byte4 = (pli_clan & 0x3F) | ((transition & 0x03) << 6)
+    pattern = max(0, min(253, pattern))
 
     # Byte 5: Pattern ID (full 8 bits)
-    byte5 = pattern & 0xFF
-
-    # Byte 6: Reserved
-    byte6 = 0
-
+    byte6 = pattern & 0xFD # 253
     # Byte 7: Reserved
-    byte7 = 0
+    byte7 = 0xFF
 
-    return header + struct.pack('BBBBB', channel, byte4, byte5, byte6, byte7)
+    return _pack_pli_common(ProprietaryID.OUTPUTCH_PLI_T2P, channel, pli_clan, transition, byte6, byte7)
 
 
 def encode_outch_status_request(channel: int) -> bytes:
